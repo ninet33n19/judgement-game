@@ -173,7 +173,7 @@
     });
 
     // Show/hide start button
-    if (isHost && players.length >= 4) {
+    if (isHost && players.length >= 3) {
       $btnStart.style.display = "block";
     } else {
       $btnStart.style.display = "none";

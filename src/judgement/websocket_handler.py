@@ -267,10 +267,10 @@ class ConnectionManager:
             )
             return
 
-        if len(game.players) < 4:
+        if len(game.players) < 3:
             await self.send_to_player(
                 player_id,
-                {"type": "error", "message": "Need at least 4 players to start"},
+                {"type": "error", "message": "Need at least 3 players to start"},
             )
             return
 
