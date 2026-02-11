@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Judgement - Game</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container game-page">
+        <!-- Top Section: Header & Opponents -->
+        <header class="game-header">
+            <div class="header-left">
+                <button id="btn-back" class="icon-btn" onclick="window.location.href='/'">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                </button>
+            </div>
+            
+            <div id="opponents" class="opponents-row">
+                <!-- Dynamically filled with avatars -->
+            </div>
+
+            <div class="header-right">
+                <button id="btn-scoreboard" class="icon-btn scoreboard-btn" title="Scoreboard">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Center Section: Game Table -->
+        <main class="game-board">
+            <div class="table-surface">
+                <div id="trick-area" class="trick-area">
+                    <div id="trick-cards" class="trick-cards">
+                        <!-- Cards played in current trick -->
+                    </div>
+                </div>
+                <div id="trick-message" class="game-status-message"></div>
+            </div>
+        </main>
+
+        <!-- Bottom Section: Player Controls -->
+        <footer class="player-controls">
+            <div class="game-info-strip">
+                <div class="info-item">
+                    <span class="label">Round</span>
+                    <span id="round-info" class="value">1/19</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Trump</span>
+                    <span id="trump-display" class="value"><span id="trump-suit" class="value">-</span></span>
+                </div>
+                 <div class="info-item">
+                    <span class="label">Bid</span>
+                    <span id="my-bid-display" class="value">-</span>
+                </div>
+                 <div class="info-item">
+                    <span class="label">Won</span>
+                    <span id="my-tricks-display" class="value">0</span>
+                </div>
+            </div>
+
+            <div class="hand-container">
+                <div id="my-hand" class="hand">
+                    <!-- Player's cards -->
+                </div>
+            </div>
+            
+            <div class="player-identity">
+                <div class="avatar-circle my-avatar">
+                   <span id="my-initials">ME</span>
+                </div>
+                <div class="player-details">
+                    <span id="my-name" class="player-name">You</span>
+                    <span id="my-score" class="player-score">Score: 0</span>
+                </div>
+            </div>
+        </footer>
+
+        <!-- Modals -->
+        <div id="bid-modal" class="modal-overlay bid-modal-overlay" style="display:none;">
+            <div class="modal-sheet">
+                <div class="modal-header">
+                    <h2>Place Your Bid</h2>
+                    <p id="bid-info">How many tricks will you win?</p>
+                </div>
+                <div id="bid-options" class="bid-grid">
+                    <!-- Bid buttons generated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <div id="round-result-modal" class="modal-overlay" style="display:none;">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h2>Round Complete</h2>
+                </div>
+                <div class="table-responsive">
+                    <table id="round-result-table" class="minimal-table">
+                        <thead>
+                            <tr>
+                                <th>Player</th>
+                                <th>Bid</th>
+                                <th>Won</th>
+                                <th>Pts</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="modal-actions">
+                    <button id="btn-next-round" class="btn btn-primary full-width" style="display:none;">Next Round →</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-over-modal" class="modal-overlay" style="display:none;">
+            <div class="modal-card game-over-card">
+                <div class="modal-header">
+                    <h2>Game Over</h2>
+                </div>
+                <div id="winner-announcement" class="winner-text"></div>
+                <div class="table-responsive">
+                    <table id="final-result-table" class="minimal-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Player</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="modal-actions">
+                    <button onclick="window.location.href='/'" class="btn btn-primary full-width">Back to Lobby</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="scoreboard-modal" class="modal-overlay" style="display:none;">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h2>Scoreboard</h2>
+                </div>
+                <div class="table-responsive">
+                    <table id="scoreboard-table" class="minimal-table">
+                        <thead>
+                            <tr>
+                                <th>Player</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="modal-actions">
+                    <button id="btn-close-scoreboard" class="btn btn-outline full-width">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="status-overlay" class="toast-notification" style="display:none;">
+            <span id="status-text"></span>
+        </div>
+    </div>
+
+    <script src="/static/js/game.js"></script>
+</body>
+</html>

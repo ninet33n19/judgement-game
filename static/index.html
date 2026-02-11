@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Judgement - Card Game</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container landing-page">
+        <div class="landing-container">
+            <div class="landing-hero">
+                <div class="logo-suits">
+                    <span class="suit-deco s1">♠</span>
+                    <span class="suit-deco s2">♥</span>
+                    <span class="suit-deco s3">♦</span>
+                    <span class="suit-deco s4">♣</span>
+                </div>
+                <h1 class="game-title">Judgement</h1>
+                <p class="subtitle">The Classic Card Game</p>
+            </div>
+
+            <div class="landing-form">
+                <div class="form-section">
+                    <label for="player-name">Your Name</label>
+                    <input type="text" id="player-name" placeholder="Enter your name" maxlength="20" autocomplete="off">
+                </div>
+
+                <div class="button-group">
+                    <button id="btn-create" class="btn btn-primary">Create Room</button>
+                    <div class="divider"><span>or join existing</span></div>
+                    <div class="join-group">
+                        <input type="text" id="room-code" placeholder="Room Code" maxlength="6" autocomplete="off"
+                            style="text-transform: uppercase;">
+                        <button id="btn-join" class="btn btn-secondary">Join</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="error-msg" class="error-msg" style="display:none;"></div>
+
+            <!-- Waiting Room (hidden initially) -->
+            <div id="waiting-room" class="waiting-room" style="display:none;">
+                <div class="waiting-header">
+                    <h2>Room: <span id="display-room-code"></span></h2>
+                    <button id="btn-copy-code" class="btn btn-small btn-outline" title="Copy room code">Copy</button>
+                </div>
+                <div class="players-list">
+                    <h3>Players</h3>
+                    <ul id="player-list"></ul>
+                    <p class="hint">Need at least 4 players to start (max 6)</p>
+                </div>
+                <button id="btn-start" class="btn btn-primary full-width" style="display:none;">Start Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>
