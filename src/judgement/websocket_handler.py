@@ -552,12 +552,7 @@ class ConnectionManager:
             )
             return
 
-        if game.host_id != player_id:
-            await self.send_to_player(
-                player_id,
-                {"type": "error", "message": "Only the host can start the next round"},
-            )
-            return
+        # Any player can advance (removed host-only restriction for QoL)
 
         # Advance to next round (increments index and dealer)
         has_next = advance_to_next_round(game)
