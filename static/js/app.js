@@ -21,11 +21,25 @@
   const $formSection = document.querySelector(".form-section");
   const $buttonGroup = document.querySelector(".button-group");
 
+  // ── Persistent State (localStorage) ──
+  const savedRoom = localStorage.getItem("room_code");
+  const savedName = localStorage.getItem("player_name");
+  const gamePhase = localStorage.getItem("game_phase");
+
+  // On load: redirect to game if in progress
+  if (savedRoom && savedName && gamePhase === "in_progress") {
+    window.location.replace(
+      `/game?room=${encodeURIComponent(savedRoom)}&name=${encodeURIComponent(savedName)}`
+    );
+    return;
+  }
+
   let ws = null;
   let myPlayerId = null;
   let isHost = false;
   let currentRoomCode = null;
   let currentHostId = null;
+  let reconnecting = false; // true when auto-reconnecting on page load
 
   // ── Helpers ──
 
@@ -73,7 +87,9 @@
 
     ws.onerror = (err) => {
       console.error("WebSocket error:", err);
-      showError("Connection error. Please refresh the page.");
+      if (!reconnecting) {
+        showError("Connection error. Please refresh the page.");
+      }
     };
 
     ws.onclose = () => {
@@ -93,16 +109,17 @@
     switch (msg.type) {
       case "connected":
         myPlayerId = msg.player_id;
-        sessionStorage.setItem("player_id", myPlayerId);
+        localStorage.setItem("player_id", myPlayerId);
         break;
 
       case "room_created":
         currentRoomCode = msg.room_code;
         currentHostId = msg.game ? msg.game.host_id : myPlayerId;
         isHost = true;
-        sessionStorage.setItem("room_code", currentRoomCode);
-        sessionStorage.setItem("is_host", "true");
-        sessionStorage.setItem("player_name", $playerName.value.trim());
+        localStorage.setItem("room_code", currentRoomCode);
+        localStorage.setItem("is_host", "true");
+        localStorage.setItem("player_name", $playerName.value.trim());
+        localStorage.setItem("game_phase", "waiting");
         showWaitingRoom(msg.room_code, msg.players || []);
         break;
 
@@ -110,9 +127,13 @@
         currentRoomCode = msg.room_code;
         currentHostId = msg.game ? msg.game.host_id : null;
         isHost = currentHostId === myPlayerId;
-        sessionStorage.setItem("room_code", currentRoomCode);
-        sessionStorage.setItem("is_host", isHost ? "true" : "false");
-        sessionStorage.setItem("player_name", $playerName.value.trim());
+        localStorage.setItem("room_code", currentRoomCode);
+        localStorage.setItem("is_host", isHost ? "true" : "false");
+        // Use input value or saved name (for reconnects)
+        const joinName = $playerName.value.trim() || savedName || "";
+        if (joinName) localStorage.setItem("player_name", joinName);
+        localStorage.setItem("game_phase", "waiting");
+        reconnecting = false;
         showWaitingRoom(msg.room_code, msg.players || []);
         break;
 
@@ -126,18 +147,38 @@
         updatePlayerList(msg.players || []);
         if (msg.new_host_id === myPlayerId) {
           isHost = true;
-          sessionStorage.setItem("is_host", "true");
+          localStorage.setItem("is_host", "true");
           $btnStart.style.display = "block";
         }
         break;
 
+      case "player_disconnected":
+        // Player temporarily disconnected – update list but don't remove them
+        updatePlayerList(msg.players || []);
+        break;
+
       case "game_started":
-        // Navigate to game page — the WS will be re-established there
-        window.location.href = "/game";
+        localStorage.setItem("game_phase", "in_progress");
+        const name =
+          $playerName.value.trim() || localStorage.getItem("player_name");
+        const room = currentRoomCode || localStorage.getItem("room_code");
+        const gameUrl =
+          room && name
+            ? `/game?room=${encodeURIComponent(room)}&name=${encodeURIComponent(name)}`
+            : "/game";
+        window.location.href = gameUrl;
         break;
 
       case "error":
-        showError(msg.message);
+        if (reconnecting) {
+          // Reconnect failed (room gone, etc) – clear saved state and show form
+          reconnecting = false;
+          localStorage.removeItem("room_code");
+          localStorage.removeItem("game_phase");
+          console.log("Auto-reconnect failed:", msg.message);
+        } else {
+          showError(msg.message);
+        }
         break;
 
       default:
@@ -228,4 +269,19 @@
   $roomCode.addEventListener("keydown", (e) => {
     if (e.key === "Enter") $btnJoin.click();
   });
+
+  // ── Auto-reconnect on page load ──
+  // If we had a saved waiting-room session, reconnect automatically
+  if (savedRoom && savedName && gamePhase === "waiting") {
+    reconnecting = true;
+    // Pre-fill the name field so it's visible
+    $playerName.value = savedName;
+    connectWS(() => {
+      send({
+        type: "join_room",
+        player_name: savedName,
+        room_code: savedRoom,
+      });
+    });
+  }
 })();

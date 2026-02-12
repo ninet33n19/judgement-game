@@ -27,7 +27,7 @@
   const $myScore = document.getElementById("my-score");
   const $myBidDisplay = document.getElementById("my-bid-display");
   const $myTricksDisplay = document.getElementById("my-tricks-display");
-  
+
   // Modals
   const $bidModal = document.getElementById("bid-modal");
   const $bidInfo = document.getElementById("bid-info");
@@ -44,26 +44,38 @@
   const $btnCloseScoreboard = document.getElementById("btn-close-scoreboard");
   const $statusOverlay = document.getElementById("status-overlay");
   const $statusText = document.getElementById("status-text");
+  const $trumpBadge = document.getElementById("trump-badge");
+  const $trumpBadgeSymbol = document.getElementById("trump-badge-symbol");
 
   // ── Game State ──
   let ws = null;
-  let myPlayerId = sessionStorage.getItem("player_id");
-  let myPlayerName = sessionStorage.getItem("player_name") || "You";
-  let roomCode = sessionStorage.getItem("room_code");
-  let isHost = sessionStorage.getItem("is_host") === "true";
+  const urlParams = new URLSearchParams(window.location.search);
+  let myPlayerId = localStorage.getItem("player_id");
+  let myPlayerName = urlParams.get("name") || localStorage.getItem("player_name") || "You";
+  let roomCode = urlParams.get("room") || localStorage.getItem("room_code");
+  let isHost = localStorage.getItem("is_host") === "true";
+  let reconnectDelay = 500;
 
-  let myHand = [];          
-  let validCards = [];       
-  let players = [];          
+  // Reinforce storage; put session in URL so hard refresh preserves it
+  if (roomCode && !localStorage.getItem("room_code")) localStorage.setItem("room_code", roomCode);
+  if (myPlayerName !== "You" && !localStorage.getItem("player_name")) localStorage.setItem("player_name", myPlayerName);
+  if (roomCode && myPlayerName !== "You" && typeof history.replaceState === "function") {
+    const params = new URLSearchParams({ room: roomCode, name: myPlayerName });
+    history.replaceState(null, "", "/game?" + params.toString());
+  }
+
+  let myHand = [];
+  let validCards = [];
+  let players = [];
   let trumpSuit = null;
   let roundNum = 0;
   let totalRounds = 0;
   let numCards = 0;
   let myBid = "-";
   let myTricksWon = 0;
-  let currentPhase = null;   
-  let currentTurnId = null;  
-  let trickCardsPlayed = []; 
+  let currentPhase = null;
+  let currentTurnId = null;
+  let trickCardsPlayed = [];
 
   // ── Status Toast Functions (CRITICAL - were missing before!) ──
 
@@ -97,6 +109,7 @@
 
     ws.onopen = () => {
       console.log("Game WS connected");
+      reconnectDelay = 500; // reset backoff on success
     };
 
     ws.onmessage = (event) => {
@@ -106,12 +119,15 @@
 
     ws.onerror = (err) => {
       console.error("WS error:", err);
-      showStatus("Connection error. Refresh.");
     };
 
     ws.onclose = () => {
-      console.log("WS closed");
-      showStatus("Disconnected.");
+      console.log("WS closed, reconnecting in", reconnectDelay, "ms");
+      showStatus("Reconnecting...");
+      setTimeout(() => {
+        reconnectDelay = Math.min(reconnectDelay * 2, 5000);
+        connectWS();
+      }, reconnectDelay);
     };
   }
 
@@ -128,7 +144,8 @@
     switch (msg.type) {
       case "connected":
         myPlayerId = msg.player_id;
-        sessionStorage.setItem("player_id", myPlayerId);
+        localStorage.setItem("player_id", myPlayerId);
+        // Re-join room on reconnect
         send({
           type: "join_room",
           player_name: myPlayerName,
@@ -137,9 +154,22 @@
         break;
 
       case "room_joined":
+        if (msg.room_code) {
+          roomCode = msg.room_code;
+          localStorage.setItem("room_code", roomCode);
+          if (typeof history.replaceState === "function") {
+            const p = new URLSearchParams(window.location.search);
+            p.set("room", roomCode);
+            p.set("name", myPlayerName);
+            history.replaceState(null, "", "/game?" + p.toString());
+          }
+        }
+        if (msg.game && msg.game.phase && msg.game.phase !== "waiting") {
+          localStorage.setItem("game_phase", "in_progress");
+        }
         if (msg.game && msg.game.host_id) {
           isHost = msg.game.host_id === myPlayerId;
-          sessionStorage.setItem("is_host", isHost ? "true" : "false");
+          localStorage.setItem("is_host", isHost ? "true" : "false");
         }
         onRoomJoined(msg);
         break;
@@ -151,7 +181,7 @@
         }
         if (msg.host_id) {
           isHost = msg.host_id === myPlayerId;
-          sessionStorage.setItem("is_host", isHost ? "true" : "false");
+          localStorage.setItem("is_host", isHost ? "true" : "false");
         }
         break;
 
@@ -162,10 +192,18 @@
         }
         if (msg.new_host_id) {
           isHost = msg.new_host_id === myPlayerId;
-          sessionStorage.setItem("is_host", isHost ? "true" : "false");
+          localStorage.setItem("is_host", isHost ? "true" : "false");
         } else if (msg.host_id) {
           isHost = msg.host_id === myPlayerId;
-          sessionStorage.setItem("is_host", isHost ? "true" : "false");
+          localStorage.setItem("is_host", isHost ? "true" : "false");
+        }
+        break;
+
+      case "player_disconnected":
+        // Player temporarily offline — update list but keep them
+        if (msg.players) {
+          players = msg.players;
+          renderOpponents();
         }
         break;
 
@@ -208,6 +246,12 @@
       case "error":
         showStatus(msg.message);
         setTimeout(hideStatus, 3000);
+        if (msg.message && /room not found/i.test(msg.message)) {
+          localStorage.removeItem("room_code");
+          localStorage.removeItem("player_name");
+          localStorage.removeItem("game_phase");
+          setTimeout(() => { window.location.href = "/"; }, 1500);
+        }
         break;
     }
   }
@@ -215,21 +259,61 @@
   // ── Handlers ──
 
   function onRoomJoined(msg) {
-    players = msg.players || [];
     if (msg.game) {
-      roundNum = (msg.game.current_round_index || 0) + 1;
-      totalRounds = msg.game.total_rounds || 19;
+      const g = msg.game;
+      isHost = g.host_id === myPlayerId;
+      localStorage.setItem("is_host", isHost ? "true" : "false");
+
+      // Update persistent round info
+      if (g.current_round) {
+        roundNum = (g.current_round_index || 0) + 1; // 0-indexed on server
+        totalRounds = g.round_sequence ? g.round_sequence.length : 19;
+        trumpSuit = g.current_round.trump;
+
+        $roundInfo.textContent = `${roundNum}/${totalRounds}`;
+        $trumpBadge.style.display = "flex";
+        $trumpBadgeSymbol.textContent = SUIT_SYMBOLS[trumpSuit] || trumpSuit;
+        $trumpBadgeSymbol.className = `trump-symbol trump-${trumpSuit}`;
+
+        // Also update bottom strip for redundancy
+        $trumpSuit.textContent = SUIT_SYMBOLS[trumpSuit] || trumpSuit;
+        $trumpSuit.className = `value trump-${trumpSuit}`;
+
+        // Restore bids/tricks if available
+        const myData = (msg.players || []).find(p => p.id === myPlayerId);
+        if (myData) {
+          $myScore.textContent = `Score: ${myData.total_score || 0}`;
+          // If bid is known, show it
+          if (g.current_round.bids && g.current_round.bids[myPlayerId] !== undefined) {
+            myBid = g.current_round.bids[myPlayerId];
+            $myBidDisplay.textContent = myBid;
+          }
+        }
+      }
     }
-    
+
+    if (msg.players) {
+      players = msg.players;
+    }
+
     $myName.textContent = myPlayerName;
     $myInitials.textContent = getInitials(myPlayerName);
-    
     renderOpponents();
-    
+
+    // If we have a hand (reconnected mid-game), render it
+    if (msg.game && msg.game.phase !== 'waiting' && msg.players) {
+      // Find my hand in the players list if not sent separately
+      const me = msg.players.find(p => p.id === myPlayerId);
+      if (me && me.hand) {
+        myHand = me.hand;
+        renderHand();
+      }
+    }
+
     if (msg.game && msg.game.phase === 'waiting') {
-        showStatus("Waiting for host to start game...");
+      showStatus("Waiting for host to start game...");
     } else {
-        hideStatus();
+      hideStatus();
     }
   }
 
@@ -249,12 +333,21 @@
 
     // Update UI
     $roundInfo.textContent = `${roundNum}/${totalRounds}`;
+
+    // Update floating trump badge
+    $trumpBadge.style.display = "flex";
+    $trumpBadgeSymbol.textContent = SUIT_SYMBOLS[trumpSuit] || trumpSuit;
+    $trumpBadgeSymbol.className = `trump-symbol trump-${trumpSuit}`;
+
+    // Update bottom info strip (redundancy)
+    $trumpSuit.textContent = SUIT_SYMBOLS[trumpSuit] || trumpSuit;
+    $trumpSuit.className = `value trump-${trumpSuit}`;
     $trumpSuit.textContent = SUIT_SYMBOLS[trumpSuit] || trumpSuit;
     $trumpSuit.className = `value trump-${trumpSuit}`;
 
     $myBidDisplay.textContent = "-";
     $myTricksDisplay.textContent = "0";
-    
+
     // Update players and score from server data
     if (msg.players) {
       players = msg.players;
@@ -317,7 +410,7 @@
   function onPlayRequest(msg) {
     validCards = msg.valid_cards || [];
     myHand = msg.hand || myHand;
-    renderHand(); 
+    renderHand();
     showStatus("Your turn – play a card");
   }
 
@@ -369,8 +462,8 @@
 
     // Update internal scores
     results.forEach(r => {
-        const p = players.find(pl => pl.id === r.player_id);
-        if (p) p.total_score = r.total_score;
+      const p = players.find(pl => pl.id === r.player_id);
+      if (p) p.total_score = r.total_score;
     });
     const me = players.find(p => p.id === myPlayerId);
     if (me) $myScore.textContent = `Score: ${me.total_score}`;
@@ -395,7 +488,7 @@
     // Sync host from server
     if (msg.game && msg.game.host_id) {
       isHost = msg.game.host_id === myPlayerId;
-      sessionStorage.setItem("is_host", isHost ? "true" : "false");
+      localStorage.setItem("is_host", isHost ? "true" : "false");
     }
 
     if (isHost) {
@@ -411,6 +504,7 @@
 
   function onGameOver(msg) {
     currentPhase = "game_over";
+    localStorage.setItem("game_phase", "ended");
     const results = msg.results || {};
     const rankings = results.rankings || [];
     const winner = results.winner;
@@ -429,7 +523,7 @@
       const tr = document.createElement("tr");
       const isMe = r.player_id === myPlayerId;
       if (isMe) tr.classList.add("is-me");
-      
+
       let medal = "";
       if (r.rank === 1) medal = "🥇 ";
       else if (r.rank === 2) medal = "🥈 ";
@@ -460,7 +554,7 @@
     const totalCards = sorted.length;
     sorted.forEach((card, index) => {
       const el = createCardElement(card);
-      
+
       const isPlayable = validCards.some(
         (vc) => vc.suit === card.suit && vc.rank === card.rank
       );
@@ -523,20 +617,20 @@
       const container = document.createElement("div");
       container.className = "opponent-avatar-container";
       container.id = `opponent-${p.id}`;
-      
+
       const initials = getInitials(p.name);
-      
+
       // Avatar circle
       const avatar = document.createElement("div");
       avatar.className = "avatar-circle";
       avatar.innerHTML = `<span>${initials}</span>`;
-      
+
       // Bid/Tricks info badge
       const badge = document.createElement("div");
       badge.className = "bid-badge";
       badge.id = `obadge-${p.id}`;
-      badge.style.display = "none"; 
-      
+      badge.style.display = "none";
+
       // Info under avatar
       const info = document.createElement("div");
       info.className = "opponent-info";
@@ -586,15 +680,15 @@
   function updateSingleOpponentBid(playerId, bid) {
     const badge = document.getElementById(`obadge-${playerId}`);
     const stats = document.getElementById(`ostats-${playerId}`);
-    
+
     if (badge) {
-        badge.textContent = bid;
-        badge.style.display = "flex";
+      badge.textContent = bid;
+      badge.style.display = "flex";
     }
     if (stats) {
-        stats.textContent = `0/${bid}`;
-        stats.dataset.bid = bid;
-        stats.dataset.tricks = 0;
+      stats.textContent = `0/${bid}`;
+      stats.dataset.bid = bid;
+      stats.dataset.tricks = 0;
     }
   }
 
@@ -706,7 +800,7 @@
   function playCard(card) {
     send({ type: "play_card", suit: card.suit, rank: card.rank });
     validCards = [];
-    renderHand(); 
+    renderHand();
   }
 
   function closeAllModals() {

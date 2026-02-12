@@ -33,6 +33,8 @@ class ConnectionManager:
         self.room_manager = RoomManager()
         # player_id -> WebSocket
         self.connections: dict[str, WebSocket] = {}
+        # player_id -> asyncio.Task for deferred disconnect removal
+        self.disconnect_timers: dict[str, asyncio.Task] = {}
 
     async def send_to_player(self, player_id: str, message: dict) -> None:
         """Send a message to a specific player."""
@@ -66,26 +68,62 @@ class ConnectionManager:
         return player_id
 
     async def handle_disconnect(self, player_id: str) -> None:
-        """Handle player disconnection."""
+        """Handle player disconnection with grace period."""
         self.connections.pop(player_id, None)
         game = self.room_manager.get_player_room(player_id)
 
-        if game and game.phase == GamePhase.WAITING:
-            # Only remove player if game hasn't started yet
-            game = self.room_manager.remove_player(player_id)
-            if game:
-                await self.broadcast_to_room(
-                    game,
-                    {
-                        "type": "player_left",
-                        "player_id": player_id,
-                        "players": [p.to_dict(hide_hand=True) for p in game.players],
-                        "host_id": game.host_id,
-                        "new_host_id": game.host_id,
-                    },
-                )
+        if not game:
+            return
+
+        if game.phase == GamePhase.WAITING:
+            # Start a grace period — don't remove immediately
+            # Cancel any existing timer for this player
+            existing_timer = self.disconnect_timers.pop(player_id, None)
+            if existing_timer:
+                existing_timer.cancel()
+
+            # Notify room that player is temporarily disconnected
+            await self.broadcast_to_room(
+                game,
+                {
+                    "type": "player_disconnected",
+                    "player_id": player_id,
+                    "players": [p.to_dict(hide_hand=True) for p in game.players],
+                    "host_id": game.host_id,
+                },
+            )
+
+            # Schedule deferred removal after 180 seconds
+            task = asyncio.create_task(
+                self._deferred_remove(player_id, game, 180)
+            )
+            self.disconnect_timers[player_id] = task
         # If game is in progress, keep the player in the game
         # They can reconnect via join_room with the same name
+
+    async def _deferred_remove(self, player_id: str, game: Game, delay: float) -> None:
+        """Remove a player from WAITING room after grace period expires."""
+        try:
+            await asyncio.sleep(delay)
+        except asyncio.CancelledError:
+            return  # Reconnected in time, do nothing
+
+        # Timer expired — remove the player
+        self.disconnect_timers.pop(player_id, None)
+        updated_game = self.room_manager.remove_player(player_id)
+        if updated_game:
+            await self.broadcast_to_room(
+                updated_game,
+                {
+                    "type": "player_left",
+                    "player_id": player_id,
+                    "players": [
+                        p.to_dict(hide_hand=True) for p in updated_game.players
+                    ],
+                    "host_id": updated_game.host_id,
+                    "new_host_id": updated_game.host_id,
+                },
+            )
 
     async def handle_message(self, player_id: str, data: dict) -> None:
         """Route incoming messages to appropriate handlers."""
@@ -164,9 +202,13 @@ class ConnectionManager:
             )
             return
 
-        # If reconnecting, remove old connection mapping
+        # If reconnecting, remove old connection mapping and cancel disconnect timer
         if old_player_id:
             self.connections.pop(old_player_id, None)
+            # Cancel any pending disconnect timer
+            timer = self.disconnect_timers.pop(old_player_id, None)
+            if timer:
+                timer.cancel()
 
         # Send initial room joined message
         await self.send_to_player(

@@ -530,6 +530,54 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+/* ═══════ Floating Trump Badge ═══════ */
+
+.trump-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 5px 12px;
+    z-index: 20;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.trump-badge .trump-label {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.6rem;
+    opacity: 0.7;
+}
+
+.trump-badge .trump-symbol {
+    font-size: 1.3rem;
+    line-height: 1;
+}
+
+.trump-badge .trump-symbol.trump-spades {
+    color: #c8cdd3;
+}
+
+.trump-badge .trump-symbol.trump-clubs {
+    color: #a8e6cf;
+}
+
+.trump-badge .trump-symbol.trump-diamonds {
+    color: #ff8a80;
+}
+
+.trump-badge .trump-symbol.trump-hearts {
+    color: #ff5252;
+}
+
 /* ═══════ Modals ═══════ */
 
 .modal-overlay {
@@ -545,14 +593,14 @@ body {
     animation: fadeOverlay 0.2s ease;
 }
 
-/* Bid modal: lighter overlay so cards are visible */
+/* Bid modal: NO blur, minimal overlay so cards are clearly visible */
 .bid-modal-overlay {
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-    background: rgba(0, 0, 0, 0.35);
-    align-items: center;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.10);
+    align-items: flex-start;
     justify-content: center;
-    padding-bottom: clamp(140px, 28vh, 220px);
+    padding-top: clamp(16px, 4vh, 40px);
 }
 
 .bid-modal-overlay .modal-sheet {

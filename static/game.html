@@ -4,7 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#7c3aed">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Judgement - Game</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="stylesheet" href="/static/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -41,6 +47,10 @@
 
         <!-- Center Section: Game Table -->
         <main class="game-board">
+            <div id="trump-badge" class="trump-badge" style="display:none;">
+                <span class="trump-label">Trump</span>
+                <span id="trump-badge-symbol" class="trump-symbol"></span>
+            </div>
             <div class="table-surface">
                 <div id="bid-summary" class="bid-summary" style="display:none;"></div>
                 <div id="trick-area" class="trick-area">
@@ -185,7 +195,12 @@
     </div>
 
     <script src="/static/js/sounds.js"></script>
-    <script src="/static/js/game.js"></script>
+    <script src="/static/js/game.js?v=3"></script>
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("/static/sw.js").catch(() => { });
+        }
+    </script>
 </body>
 
 </html>

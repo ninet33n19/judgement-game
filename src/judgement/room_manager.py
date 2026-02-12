@@ -55,41 +55,39 @@ class RoomManager:
         if any(p.id == player_id for p in game.players):
             return game, "", None
 
-        # If game is in progress, allow reconnection by name
+        # Allow reconnection by name in ANY phase (handles page refresh)
+        existing = next((p for p in game.players if p.name == player_name), None)
+        if existing:
+            old_id = existing.id
+            existing.id = player_id
+            # Update host_id if needed
+            if game.host_id == old_id:
+                game.host_id = player_id
+            # Update bids dict key if needed
+            if game.current_round and old_id in game.current_round.bids:
+                game.current_round.bids[player_id] = game.current_round.bids.pop(
+                    old_id
+                )
+            # Update current trick references if needed
+            if game.current_round and game.current_round.current_trick:
+                trick = game.current_round.current_trick
+                if trick.lead_player_id == old_id:
+                    trick.lead_player_id = player_id
+                trick.cards_played = [
+                    (player_id if pid == old_id else pid, card)
+                    for pid, card in trick.cards_played
+                ]
+            # Update player_rooms mapping
+            self.player_rooms.pop(old_id, None)
+            self.player_rooms[player_id] = room_code
+            return game, "", old_id
+
+        # New player joining — only allowed during WAITING phase
         if game.phase != GamePhase.WAITING:
-            existing = next((p for p in game.players if p.name == player_name), None)
-            if existing:
-                old_id = existing.id
-                existing.id = player_id
-                # Update host_id if needed
-                if game.host_id == old_id:
-                    game.host_id = player_id
-                # Update bids dict key if needed
-                if game.current_round and old_id in game.current_round.bids:
-                    game.current_round.bids[player_id] = game.current_round.bids.pop(
-                        old_id
-                    )
-                # Update current trick references if needed
-                if game.current_round and game.current_round.current_trick:
-                    trick = game.current_round.current_trick
-                    if trick.lead_player_id == old_id:
-                        trick.lead_player_id = player_id
-                    trick.cards_played = [
-                        (player_id if pid == old_id else pid, card)
-                        for pid, card in trick.cards_played
-                    ]
-                # Update player_rooms mapping
-                self.player_rooms.pop(old_id, None)
-                self.player_rooms[player_id] = room_code
-                return game, "", old_id
             return None, "Game already in progress", None
 
         if len(game.players) >= 6:
             return None, "Room is full (max 6 players)", None
-
-        # Check for duplicate names
-        if any(p.name == player_name for p in game.players):
-            return None, f"Name '{player_name}' is already taken in this room", None
 
         player = Player(id=player_id, name=player_name)
         game.players.append(player)
