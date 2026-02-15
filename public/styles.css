@@ -635,104 +635,104 @@ p {
 
 /* Bidding Screen Layout */
 .bidding-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
 .bidding-main {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  align-items: center;
 }
 
 .hand-area-section {
-    width: 100%;
-    display: flex;
-    justify-content: center;
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .bidding-controls {
-    text-align: center;
-    background: var(--glass-bg);
-    padding: 1.5rem;
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--glass-border);
-    backdrop-filter: blur(10px);
-    width: 100%;
-    max-width: 500px;
+  text-align: center;
+  background: var(--glass-bg);
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  width: 100%;
+  max-width: 500px;
 }
 
 .bid-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-    gap: 0.75rem;
-    margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .bid-btn {
-    padding: 0.75rem;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .bid-btn:hover:not(:disabled) {
-    background: var(--accent-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  background: var(--accent-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
 .bid-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .player-status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
-    width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  width: 100%;
 }
 
 .player-mini {
-    background: var(--glass-bg);
-    padding: 1rem;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--glass-border);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    text-align: center;
+  background: var(--glass-bg);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
 }
 
 .player-mini .name {
-    font-weight: 600;
-    font-size: 0.875rem;
+  font-weight: 600;
+  font-size: 0.875rem;
 }
 
 .player-mini .status {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
 }
 
 .player-mini.active {
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
 .player-mini.bid-placed {
-    background: rgba(34, 197, 94, 0.1);
-    border-color: rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.2);
 }
 
 .bidding-content {
@@ -1801,6 +1801,26 @@ p {
    DESKTOP OVERRIDE
    Large-screen experience (≥ 1024px)
    ---------------------------------- */
+
+@media (max-width: 1023px) {
+
+  /* Mobile/Tablet Hand Overlap */
+  .my-hand-container .card {
+    margin-left: -35px;
+    /* Overlap cards */
+  }
+
+  .my-hand-container .card:first-child {
+    margin-left: 0;
+  }
+
+  .table-cards-grid .card {
+    /* Ensure table cards don't look huge on mobile/tablet if not overridden */
+    max-width: 70px;
+    max-height: 100px;
+  }
+}
+
 @media (min-width: 1024px) {
 
   /* Layout & Spacing */
@@ -1824,66 +1844,64 @@ p {
     gap: 1rem;
   }
 
-    .info-badge {
-        padding: 0.75rem 1.25rem;
-    }
+  .info-badge {
+    padding: 0.75rem 1.25rem;
+  }
 
-    .info-badge .label {
-        font-size: 0.875rem;
-    }
+  .info-badge .label {
+    font-size: 0.875rem;
+  }
 
-    .info-badge .value {
-        font-size: 1.5rem;
-    }
+  .info-badge .value {
+    font-size: 1.5rem;
+  }
 
-@media (min-width: 1024px) {
-    /* Bidding Scaling */
-    .bidding-content {
-        max-width: 1000px;
-    }
+  /* Bidding Scaling */
+  .bidding-content {
+    max-width: 1000px;
+  }
 
-    .bid-hand-area .card {
-        width: 140px;
-        height: 196px;
-    }
+  .bid-hand-area .card {
+    width: 140px;
+    height: 196px;
+  }
 
-    .bid-btn {
-        padding: 1rem 2rem;
-        font-size: 1.5rem;
-        min-width: 80px;
-    }
+  .bid-btn {
+    padding: 1rem 2rem;
+    font-size: 1.5rem;
+    min-width: 80px;
+  }
 
-    .player-mini {
-        padding: 1.5rem;
-    }
+  .player-mini {
+    padding: 1.5rem;
+  }
 
-    .player-mini .status-pill {
-        font-size: 1rem;
-        padding: 0.5rem 1rem;
-    }
+  .player-mini .status-pill {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+  }
 
-    .info-badge {
-        padding: 0.75rem 1.25rem;
-        font-size: 1.1rem;
-    }
-}
+  .info-badge {
+    padding: 0.75rem 1.25rem;
+    font-size: 1.1rem;
+  }
 
-    .player-mini {
-        padding: 1.5rem 2rem;
-        gap: 1rem;
-    }
+  .player-mini {
+    padding: 1.5rem 2rem;
+    gap: 1rem;
+  }
 
-    .player-mini .name {
-        font-size: 1.25rem;
-    }
+  .player-mini .name {
+    font-size: 1.25rem;
+  }
 
-    .player-mini .status {
-        font-size: 1rem;
-    }
-}
+  .player-mini .status {
+    font-size: 1rem;
+  }
 
-/* Opponents (Top) */
-.opponents-container {
+
+  /* Opponents (Top) */
+  .opponents-container {
     padding-top: 4rem;
     padding-bottom: 2rem;
   }
@@ -1893,10 +1911,12 @@ p {
   }
 
   .opponent-avatar {
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
     border-width: 3px;
+    box-shadow: var(--shadow-md);
   }
+
 
   .card-count-badge {
     width: 32px;
@@ -1940,17 +1960,17 @@ p {
 
   /* Cards on Table - Override dimensions */
   .table-cards-grid .card {
-    width: 200px !important;
-    height: 280px !important;
+    width: 160px !important;
+    height: 224px !important;
     box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
   }
 
   .table-cards-grid .card .rank {
-    font-size: 3.5rem !important;
+    font-size: 3rem !important;
   }
 
   .table-cards-grid .card .suit {
-    font-size: 4.5rem !important;
+    font-size: 4rem !important;
   }
 
   /* Dashboard (Bottom) */
@@ -1976,8 +1996,19 @@ p {
     width: 80px;
     height: 80px;
     border-width: 3px;
-    box-shadow: 0 0 16px var(--accent-glow);
+    box-shadow: 0 0 20px var(--accent-glow);
   }
+
+  /* Improved Table Look */
+  .table-container {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.2);
+    margin: 1rem auto;
+    max-width: 1200px;
+  }
+
 
   /* Actions Button */
   .game-actions {
@@ -1988,12 +2019,15 @@ p {
   }
 
   .action-btn {
-    padding: 1rem 2rem;
+    padding: 1rem 2.5rem;
     min-height: 64px;
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     border-radius: var(--radius-full);
     gap: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
+
 
   /* Player Hand */
   .my-hand-container,

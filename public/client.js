@@ -52,7 +52,7 @@ function loadCredentials() {
             if (creds.name && creds.roomId && creds.sessionToken) {
                 console.log("Found active session, attempting auto-rejoin...");
                 // Note: socket might not be ready yet, but socket.on('connect') will handle it
-                return; 
+                return;
             }
         } catch (e) {
             console.error("Failed to load active session", e);
@@ -83,7 +83,7 @@ function applyUrlRoomToForm() {
 function saveCredentials(name, roomId, sessionToken) {
     // Save to sessionStorage for pre-filling if they refresh
     sessionStorage.setItem("judgement_credentials", JSON.stringify({ name, roomId }));
-    
+
     // Save to sessionStorage for active reconnection/refresh
     if (sessionToken) {
         sessionStorage.setItem("judgement_session", JSON.stringify({ name, roomId, sessionToken }));
@@ -131,7 +131,7 @@ function setupEventListeners() {
     if (joinBtn) joinBtn.addEventListener("click", () => {
         const name = document.getElementById("name-input").value.trim();
         const roomId = document.getElementById("room-input").value.trim().toUpperCase();
-        
+
         if (!name) {
             showToast("Please enter your name", "error");
             nameInput?.focus();
@@ -174,7 +174,7 @@ function setupEventListeners() {
         "exit-btn-lobby", "exit-btn-bidding",
         "exit-btn-roundover", "exit-btn-gameover"
     ];
-    
+
     const exitBtnPlaying = document.getElementById("exit-btn-playing");
     if (exitBtnPlaying) {
         exitBtnPlaying.addEventListener("click", handleExit);
@@ -222,10 +222,10 @@ function handleExit() {
 
 function setupSocketHandlers() {
     const connectionStatus = document.getElementById("connection-status");
-    
+
     socket.on("connect", () => {
         updateConnectionStatus("connected");
-        
+
         // Try to reconnect using sessionStorage first (Active Session)
         const activeSession = sessionStorage.getItem("judgement_session");
         if (activeSession) {
@@ -233,10 +233,10 @@ function setupSocketHandlers() {
                 const creds = JSON.parse(activeSession);
                 if (creds.name && creds.roomId && creds.sessionToken) {
                     console.log("Re-joining active session...");
-                    socket.emit("join_game", { 
-                        roomId: creds.roomId, 
-                        name: creds.name, 
-                        sessionToken: creds.sessionToken 
+                    socket.emit("join_game", {
+                        roomId: creds.roomId,
+                        name: creds.name,
+                        sessionToken: creds.sessionToken
                     });
                 }
             } catch (e) {
@@ -260,7 +260,7 @@ function setupSocketHandlers() {
                 if (activeSession) {
                     try {
                         name = JSON.parse(activeSession).name;
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
             saveCredentials(name, data.roomId, data.sessionToken);
@@ -319,9 +319,9 @@ function setupSocketHandlers() {
 function updateConnectionStatus(status) {
     const el = document.getElementById("connection-status");
     if (!el) return;
-    
+
     el.classList.remove("hidden", "connecting", "disconnected");
-    
+
     if (status === "connected") {
         el.classList.add("hidden");
     } else if (status === "connecting") {
@@ -338,7 +338,7 @@ function showScreen(screenId) {
         s.classList.add("hidden");
         s.style.display = "none";
     });
-    
+
     const screen = document.getElementById(screenId);
     if (screen) {
         screen.classList.remove("hidden");
@@ -352,12 +352,12 @@ function showScreen(screenId) {
 function showToast(msg, type = "info") {
     const toast = document.getElementById("toast");
     if (!toast) return;
-    
+
     toast.textContent = msg;
     toast.className = "toast show";
     if (type === "success") toast.classList.add("success");
     if (type === "error") toast.classList.add("error");
-    
+
     setTimeout(() => {
         toast.classList.remove("show");
         toast.classList.add("hidden");
@@ -379,13 +379,13 @@ function renderLobby() {
     const isHost = players[0]?.id === myId;
 
     let html = "";
-    
+
     for (let i = 0; i < maxPlayers; i++) {
         const player = players[i];
         const isFilled = !!player;
         const isPlayerHost = i === 0;
         const animationDelay = i * 50;
-        
+
         if (isFilled) {
             html += `
                 <div class="player-slot filled ${isPlayerHost ? 'host' : ''}" style="animation-delay: ${animationDelay}ms">
@@ -411,14 +411,14 @@ function renderLobby() {
             `;
         }
     }
-    
+
     grid.innerHTML = html;
 
     const startBtn = document.getElementById("start-btn");
     if (startBtn) {
         const canStart = isHost && state.players.length >= 3;
         startBtn.disabled = !canStart;
-        
+
         if (canStart) {
             startBtn.classList.add("ready");
             startBtn.textContent = "Start Game";
@@ -483,7 +483,7 @@ function renderPlaying() {
     if (me) {
         const bidEl = document.getElementById("my-bid");
         if (bidEl) bidEl.textContent = me.bid !== null ? me.bid : '-';
-        
+
         const tricksEl = document.getElementById("my-tricks");
         if (tricksEl) tricksEl.textContent = me.tricksWon;
 
@@ -527,20 +527,77 @@ function renderHandNew(containerId) {
     const myIndex = state.players.findIndex(p => p.id === myId);
     const isMyTurn = state.currentTurnIndex === myIndex;
 
-    container.innerHTML = me.hand.map((card, i) => `
-        <div class="card ${getSuitColor(card.suit)} ${!isMyTurn ? 'invalid' : ''}" data-index="${i}" style="animation-delay: ${i * 50}ms">
+    const handSize = me.hand.length;
+    const isMobile = window.innerWidth < 768;
+    const baseAngle = isMobile ? 3 : 5; // Tighter fan on mobile
+    const rise = isMobile ? 0.8 : 1.5; // Less arch on mobile
+    const totalAngle = (handSize - 1) * baseAngle;
+    const startAngle = -totalAngle / 2;
+
+    // Filter Logic
+    const hasLeadSuit = state.leadSuit && me.hand.some(c => c.suit === state.leadSuit);
+
+    container.innerHTML = me.hand.map((card, i) => {
+        const rotation = startAngle + (i * baseAngle);
+        const translateY = Math.abs(rotation) * rise;
+
+        let isPlayable = true;
+        if (isMyTurn && state.leadSuit) {
+            if (hasLeadSuit && card.suit !== state.leadSuit) {
+                isPlayable = false;
+            }
+        }
+
+        // Visual state
+        const opacity = isPlayable ? 1 : 0.4;
+        const filter = isPlayable ? 'none' : 'grayscale(100%) brightness(0.7)';
+        const cursor = isPlayable && isMyTurn ? 'pointer' : 'not-allowed';
+
+        return `
+        <div class="card ${getSuitColor(card.suit)} ${!isMyTurn || !isPlayable ? 'invalid' : ''}" 
+             data-index="${i}" 
+             data-playable="${isPlayable}"
+             style="
+                --rot: ${rotation}deg; 
+                --y: ${translateY}px;
+                animation-delay: ${i * 30}ms;
+                transform: rotate(var(--rot)) translateY(var(--y));
+                opacity: ${opacity};
+                filter: ${filter};
+                cursor: ${cursor};
+             ">
             <div class="card-content">
                 <span class="rank">${card.rank}</span>
                 <span class="suit">${getSuitSymbol(card.suit)}</span>
             </div>
         </div>
-    `).join("");
+    `}).join("");
 
     container.querySelectorAll(".card").forEach(cardEl => {
         cardEl.addEventListener("click", () => {
             if (!isMyTurn) return;
+
+            const isPlayable = cardEl.dataset.playable === "true";
+            if (!isPlayable) {
+                showToast("You must follow suit!", "error");
+                return;
+            }
+
             const index = parseInt(cardEl.dataset.index);
             socket.emit("play_card", index);
+        });
+
+        // Hover effect to straighten card
+        cardEl.addEventListener("mouseenter", () => {
+            if (isMyTurn) {
+                cardEl.style.transform = `rotate(0deg) translateY(-20px) scale(1.1)`;
+                cardEl.style.zIndex = "100";
+            }
+        });
+
+        cardEl.addEventListener("mouseleave", () => {
+            cardEl.style.transform = `rotate(var(--rot)) translateY(var(--y))`;
+            cardEl.style.zIndex = "";
         });
     });
 }
@@ -607,11 +664,11 @@ function renderTableCards(containerId) {
     const totalSlots = state.players.length;
 
     let html = "";
-    
+
     for (let i = 0; i < totalSlots; i++) {
         const tableEntry = state.table[i];
         const player = state.players[i];
-        
+
         if (tableEntry && tableEntry.card) {
             html += `
                 <div class="played-card-slot">
@@ -631,20 +688,20 @@ function renderTableCards(containerId) {
             `;
         }
     }
-    
+
     container.innerHTML = html;
 }
 
 function renderPlayerRow(containerId, showBid) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    
+
     const currentPlayerIndex = state.currentTurnIndex;
 
     container.innerHTML = state.players.map((p, i) => {
         const isActive = i === currentPlayerIndex;
         const animationDelay = i * 50;
-        
+
         return `
             <div class="player-mini ${isActive ? 'active' : ''}" style="animation-delay: ${animationDelay}ms">
                 <div class="mini-avatar">
@@ -660,7 +717,7 @@ function renderPlayerRow(containerId, showBid) {
 function renderTopPlayers(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    
+
     const currentPlayerIndex = state.currentTurnIndex;
     const me = state.players.find(p => p.id === myId);
     const myHandCount = me?.hand.length || 0;
@@ -688,17 +745,17 @@ function renderTopPlayers(containerId) {
 
 function renderRoundOver() {
     showScreen("round-over-screen");
-    
+
     const roundResultNum = document.getElementById("round-result-num");
     if (roundResultNum) roundResultNum.textContent = state.roundNumber;
 
     const results = document.getElementById("round-results");
     const sortedPlayers = [...state.players].sort((a, b) => b.score - a.score);
-    
+
     results.innerHTML = sortedPlayers.map((p, i) => {
         const isWinner = i === 0;
         const animationDelay = i * 80;
-        
+
         return `
             <div class="result-row ${isWinner ? 'winner' : ''}" style="animation-delay: ${animationDelay}ms">
                 <span class="rank">${i + 1}</span>
@@ -718,12 +775,12 @@ function renderGameOver() {
     showScreen("game-over-screen");
     const scores = document.getElementById("final-scores");
     const sorted = [...state.players].sort((a, b) => b.score - a.score);
-    
+
     scores.innerHTML = sorted.map((p, i) => {
         const isWinner = i === 0;
         const animationDelay = i * 100;
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
-        
+
         return `
             <div class="result-row ${isWinner ? 'winner' : ''}" style="animation-delay: ${animationDelay}ms">
                 <span class="rank">${medal || i + 1}</span>
