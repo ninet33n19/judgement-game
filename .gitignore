@@ -1,2 +1,7 @@
 # deps
 node_modules/
+
+# env (Redis URL from Redis Cloud dashboard)
+.env
+
+.idea/
