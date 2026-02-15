@@ -865,6 +865,19 @@ p {
   box-shadow: var(--shadow-glow);
 }
 
+.bid-btn.unavailable {
+  text-decoration: line-through;
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.bid-btn.unavailable:hover {
+  transform: none;
+  background: var(--bg-tertiary);
+  border-color: var(--glass-border);
+}
+
 .player-row {
   display: flex;
   flex-wrap: wrap;

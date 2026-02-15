@@ -292,10 +292,13 @@
                                 <div
                                     class="info-badge"
                                     style="height: 40px; padding: 0 1rem"
+                                    title="Won / Bid"
                                 >
-                                    <span id="my-bid" class="value">-</span>
-                                    <span class="label">/</span>
+                                    <span class="label">Won</span>
                                     <span id="my-tricks" class="value">0</span>
+                                    <span class="label">/</span>
+                                    <span id="my-bid" class="value">-</span>
+                                    <span class="label">Bid</span>
                                 </div>
                             </div>
 
@@ -307,14 +310,7 @@
                                 <!-- My avatar here -->
                             </div>
 
-                            <button
-                                id="btn-play-card"
-                                class="action-btn"
-                                disabled
-                                style="flex: 1"
-                            >
-                                Play Card
-                            </button>
+                            <span id="play-turn-label" class="turn-indicator" style="align-self: center; min-width: 6rem;"></span>
                         </div>
 
                         <div class="my-hand-container">

@@ -187,34 +187,16 @@ function setupEventListeners() {
         }
     });
 
-    const playBtn = document.getElementById("btn-play-card");
-    if (playBtn) {
-        playBtn.addEventListener("click", () => {
-            if (selectedHandIndex !== null) {
-                socket.emit("play_card", selectedHandIndex);
-                selectedHandIndex = null;
-            } else {
-                showToast("Select a card first", "error");
-            }
-        });
-    }
-
     document.addEventListener("keydown", (e) => {
         if (!state || state.phase !== "PLAYING") return;
-        
-        if (e.code === "Space" && selectedHandIndex !== null) {
-            e.preventDefault();
-            socket.emit("play_card", selectedHandIndex);
-            selectedHandIndex = null;
-        }
-        
-        if (e.key >= "1" && e.key <= "9") {
+        const myIndex = state.players.findIndex(p => p.id === myId);
+        if (state.currentTurnIndex !== myIndex) return;
+        const me = state.players.find(p => p.id === myId);
+        if (e.key >= "1" && e.key <= "9" && me) {
             const index = parseInt(e.key) - 1;
-            const me = state.players.find(p => p.id === myId);
-            if (me && index < me.hand.length) {
-                selectedHandIndex = index;
-                renderHandNew("hand-area");
-                updatePlayButton();
+            if (index < me.hand.length) {
+                e.preventDefault();
+                socket.emit("play_card", index);
             }
         }
     });
@@ -509,21 +491,17 @@ function renderPlaying() {
         if (avatarEl) avatarEl.innerHTML = `<img src="assets/avatars/${getAvatar(me.name)}" />`;
     }
 
-    updatePlayButton();
+    updatePlayTurnLabel();
     updateVoteUI();
 }
 
-function updatePlayButton() {
-    const btn = document.getElementById("btn-play-card");
-    if (!btn) return;
-    
-    btn.disabled = selectedHandIndex === null;
-    
-    if (selectedHandIndex !== null) {
-        btn.textContent = "Play Card";
-    } else {
-        btn.textContent = "Select a Card";
-    }
+function updatePlayTurnLabel() {
+    const el = document.getElementById("play-turn-label");
+    if (!el || !state) return;
+    const myIndex = state.players.findIndex(p => p.id === myId);
+    const isMyTurn = state.currentTurnIndex === myIndex;
+    const current = state.players[state.currentTurnIndex];
+    el.textContent = isMyTurn ? "Your turn" : (current ? current.name + "'s turn" : "");
 }
 
 function renderHand(containerId, isBidding) {
@@ -546,28 +524,23 @@ function renderHandNew(containerId) {
     const me = state.players.find(p => p.id === myId);
     if (!me || !container) return;
 
-    container.innerHTML = me.hand.map((card, i) => {
-        const isSelected = selectedHandIndex === i;
-        return `
-            <div class="card ${getSuitColor(card.suit)} ${isSelected ? 'selected' : ''}" data-index="${i}" style="animation-delay: ${i * 50}ms">
-                <div class="card-content">
-                    <span class="rank">${card.rank}</span>
-                    <span class="suit">${getSuitSymbol(card.suit)}</span>
-                </div>
+    const myIndex = state.players.findIndex(p => p.id === myId);
+    const isMyTurn = state.currentTurnIndex === myIndex;
+
+    container.innerHTML = me.hand.map((card, i) => `
+        <div class="card ${getSuitColor(card.suit)} ${!isMyTurn ? 'invalid' : ''}" data-index="${i}" style="animation-delay: ${i * 50}ms">
+            <div class="card-content">
+                <span class="rank">${card.rank}</span>
+                <span class="suit">${getSuitSymbol(card.suit)}</span>
             </div>
-        `;
-    }).join("");
+        </div>
+    `).join("");
 
     container.querySelectorAll(".card").forEach(cardEl => {
         cardEl.addEventListener("click", () => {
+            if (!isMyTurn) return;
             const index = parseInt(cardEl.dataset.index);
-            if (selectedHandIndex === index) {
-                selectedHandIndex = null;
-            } else {
-                selectedHandIndex = index;
-            }
-            renderHandNew(containerId);
-            updatePlayButton();
+            socket.emit("play_card", index);
         });
     });
 }
@@ -604,11 +577,20 @@ function renderBidButtons() {
     if (!bids.includes(maxBid)) bids.push(maxBid);
     bids.sort((a, b) => a - b);
 
-    buttons.innerHTML = bids.map(b => `
-        <button class="bid-btn" data-bid="${b}">${b}</button>
-    `).join("");
+    // Hook rule: last bidder cannot bid so that total === cardsPerPlayer
+    const playersWithBids = state.players.filter((p) => p.bid !== null).length;
+    const isLastBidder = playersWithBids === state.players.length - 1;
+    const currentTotal = state.players.reduce((sum, p) => sum + (p.bid ?? 0), 0);
+
+    buttons.innerHTML = bids.map(b => {
+        const unavailable = isLastBidder && currentTotal + b === state.cardsPerPlayer;
+        return `
+            <button class="bid-btn ${unavailable ? 'unavailable' : ''}" data-bid="${b}" ${unavailable ? 'disabled' : ''}>${b}</button>
+        `;
+    }).join("");
 
     buttons.querySelectorAll(".bid-btn").forEach(btn => {
+        if (btn.disabled) return;
         btn.addEventListener("click", () => {
             const bid = parseInt(btn.dataset.bid);
             socket.emit("place_bid", bid);
@@ -688,7 +670,7 @@ function renderTopPlayers(containerId) {
     container.innerHTML = opponents.map((p, idx) => {
         const realIndex = state.players.findIndex(pl => pl.id === p.id);
         const isActive = realIndex === currentPlayerIndex;
-        const statsText = `<span class="score">${p.score}</span> <span class="separator">|</span> <span class="bid-won">${p.bid !== null ? p.bid : '-'}/${p.tricksWon}</span>`;
+        const statsText = `<span class="score">${p.score}</span> <span class="separator">|</span> <span class="bid-won" title="Won / Bid">${p.tricksWon}/${p.bid !== null ? p.bid : '-'}</span>`;
         const animationDelay = idx * 60;
 
         return `
@@ -698,7 +680,7 @@ function renderTopPlayers(containerId) {
                     <span class="card-count-badge">${p.hand.length}</span>
                 </div>
                 <div class="opponent-stats">${statsText}</div>
-                ${isActive ? '<span class="turn-indicator">Your Turn</span>' : ''}
+                ${isActive ? '<span class="turn-indicator">' + p.name + "'s turn</span>" : ''}
             </div>
         `;
     }).join("");
