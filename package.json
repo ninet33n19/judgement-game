@@ -6,6 +6,7 @@
   "dependencies": {
     "@socket.io/bun-engine": "^0.1.0",
     "hono": "^4.11.9",
+    "ioredis": "^5.9.3",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {

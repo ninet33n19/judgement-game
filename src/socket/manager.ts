@@ -1,13 +1,16 @@
 import type { Server, Socket } from "socket.io";
 import { GameLogic } from "../game/logic";
-import { store } from "../state/store";
+import type { RedisGameStore } from "../state/store.redis";
 import type { Player } from "../types";
 
 export class SocketManager {
   private io: Server;
+  private store: RedisGameStore;
 
-  constructor(io: Server) {
+  constructor(io: Server, store: RedisGameStore) {
     this.io = io;
+    this.store = store;
+    this.store.setOnStateUpdated((roomId) => this.broadcastState(roomId));
     this.setup();
   }
 
@@ -27,10 +30,10 @@ export class SocketManager {
 
   // --- 1. JOIN GAME ---
   private handleJoin(socket: Socket) {
-    socket.on("create_room", ({ name }) => {
+    socket.on("create_room", async ({ name }) => {
       try {
         const roomId = this.generateRoomCode();
-        const game = store.createRoom(roomId);
+        const game = await this.store.createRoom(roomId);
         console.log(`Created new game with roomId: ${roomId}`);
 
         const sessionToken = crypto.randomUUID();
@@ -47,18 +50,21 @@ export class SocketManager {
 
         game.players.push(newPlayer);
         socket.join(roomId);
+        await this.store.setSocketRoom(socket.id, roomId);
+        await this.store.setSessionRoom(sessionToken, roomId);
+        await this.store.saveGame(roomId, game);
 
         socket.emit("room_created", { roomId, sessionToken });
-        this.broadcastState(roomId);
+        await this.broadcastState(roomId);
       } catch (error) {
         socket.emit("error", "Failed to create room");
         console.error(`Error in create_room: ${error}`);
       }
     });
 
-    socket.on("join_game", ({ roomId, name, sessionToken }) => {
+    socket.on("join_game", async ({ roomId, name, sessionToken }) => {
       try {
-        const game = store.getGame(roomId);
+        const game = await this.store.getGame(roomId);
 
         if (!game) {
           socket.emit("error", "Room not found");
@@ -72,12 +78,12 @@ export class SocketManager {
             playerByToken.id = socket.id;
             playerByToken.connected = true;
             socket.join(roomId);
-            
-            // Clear their votes if they had any
+            await this.store.setSocketRoom(socket.id, roomId);
             game.endGameVotes = game.endGameVotes.filter(id => id !== playerByToken.id);
-            
+
+            await this.store.saveGame(roomId, game);
             socket.emit("reconnected", { roomId, sessionToken });
-            this.broadcastState(roomId);
+            await this.broadcastState(roomId);
             return;
           }
         }
@@ -88,16 +94,15 @@ export class SocketManager {
         );
 
         if (existingPlayer) {
-          // Reconnect existing player
           existingPlayer.id = socket.id;
           existingPlayer.connected = true;
           socket.join(roomId);
-          
-          // Clear their votes if they had any
+          await this.store.setSocketRoom(socket.id, roomId);
           game.endGameVotes = game.endGameVotes.filter(id => id !== existingPlayer.id);
-          
+
+          await this.store.saveGame(roomId, game);
           socket.emit("reconnected", { roomId, sessionToken: existingPlayer.sessionToken });
-          this.broadcastState(roomId);
+          await this.broadcastState(roomId);
           return;
         }
 
@@ -107,11 +112,10 @@ export class SocketManager {
           return;
         }
 
-        // Check if player with same name is already connected
         const alreadyConnected = game.players.find(
           (p) => p.name.toLowerCase() === name.toLowerCase() && p.connected
         );
-        
+
         if (alreadyConnected) {
           socket.emit("error", "Player with this name is already in the game");
           return;
@@ -140,11 +144,13 @@ export class SocketManager {
         };
 
         game.players.push(newPlayer);
-
         socket.join(roomId);
-        socket.emit("joined_game", { roomId, sessionToken: newSessionToken });
+        await this.store.setSocketRoom(socket.id, roomId);
+        await this.store.setSessionRoom(newSessionToken, roomId);
+        await this.store.saveGame(roomId, game);
 
-        this.broadcastState(roomId);
+        socket.emit("joined_game", { roomId, sessionToken: newSessionToken });
+        await this.broadcastState(roomId);
       } catch (error) {
         socket.emit("error", "Failed to join game");
         console.error(`Error in join_game: ${error}`);
@@ -163,137 +169,121 @@ export class SocketManager {
 
   // --- 2. START GAME ---
   private handleStart(socket: Socket) {
-    socket.on("start_game", () => {
-      const game = store.findRoomByPlayerId(socket.id);
+    socket.on("start_game", async () => {
+      const game = await this.store.findRoomByPlayerId(socket.id);
       if (!game) return;
 
-      // Only the "host" (first player) should start, but for simplicity any player can now
       if (game.players.length < 3) {
         socket.emit("error", "Need at least 3 players to start");
         return;
       }
 
       GameLogic.startRound(game);
-      this.broadcastState(game.roomId);
+      await this.store.saveGame(game.roomId, game);
+      await this.broadcastState(game.roomId);
     });
   }
 
   // --- 3. PLACE BID ---
   private handleBid(socket: Socket) {
-    socket.on("place_bid", (bidAmount: number) => {
-      const game = store.findRoomByPlayerId(socket.id);
+    socket.on("place_bid", async (bidAmount: number) => {
+      const game = await this.store.findRoomByPlayerId(socket.id);
       if (!game || game.phase !== "BIDDING") return;
 
       const playerIndex = game.players.findIndex((p) => p.id === socket.id);
 
-      // Is it this player's turn?
       if (playerIndex !== game.currentTurnIndex) {
         socket.emit("error", "Not your turn to bid");
         return;
       }
 
-      // Validate Bid
       const validation = GameLogic.validateBid(game, playerIndex, bidAmount);
       if (!validation.valid) {
         socket.emit("error", validation.message);
         return;
       }
 
-      // Apply Bid
       game.players[playerIndex].bid = bidAmount;
 
-      // Check if all players have bid
       const remainingBidders = game.players.filter(
         (p) => p.bid === null,
       ).length;
 
       if (remainingBidders === 0) {
-        // Everyone bid -> Switch to Playing Phase
         game.phase = "PLAYING";
-        // Leader is player left of dealer
         game.currentTurnIndex = (game.dealerIndex + 1) % game.players.length;
       } else {
-        // Next bidder
         game.currentTurnIndex =
           (game.currentTurnIndex + 1) % game.players.length;
       }
 
-      this.broadcastState(game.roomId);
+      await this.store.saveGame(game.roomId, game);
+      await this.broadcastState(game.roomId);
     });
   }
 
   // --- 4. PLAY CARD ---
   private handlePlay(socket: Socket) {
-    socket.on("play_card", (cardIndex: number) => {
-      const game = store.findRoomByPlayerId(socket.id);
+    socket.on("play_card", async (cardIndex: number) => {
+      const game = await this.store.findRoomByPlayerId(socket.id);
       if (!game || game.phase !== "PLAYING") return;
 
       const playerIndex = game.players.findIndex((p) => p.id === socket.id);
       if (playerIndex !== game.currentTurnIndex) return;
 
-      // Validate Move
       const validation = GameLogic.validateMove(game, playerIndex, cardIndex);
       if (!validation.valid) {
         socket.emit("error", validation.message);
         return;
       }
 
-      // Execute Move
       const player = game.players[playerIndex];
-      const card = player.hand.splice(cardIndex, 1)[0]; // Remove card
+      const card = player.hand.splice(cardIndex, 1)[0];
 
-      // Set Lead Suit if first card
       if (game.table.length === 0) {
         game.leadSuit = card.suit;
       }
 
       game.table.push({ playerId: player.id, card });
 
-      // Check if trick is complete
       if (game.table.length === game.players.length) {
-        // Resolve Trick (Find winner)
         const winnerIndex = GameLogic.resolveTrick(game);
         const winnerName = game.players[winnerIndex].name;
 
         this.io.to(game.roomId).emit("trick_won", { winner: winnerName });
 
-        // Check if Round is Over (Hand empty)
         if (game.players[0].hand.length === 0) {
           GameLogic.calculateScores(game);
           game.phase = "ROUND_OVER";
-          this.broadcastState(game.roomId);
+          await this.store.saveGame(game.roomId, game);
+          await this.broadcastState(game.roomId);
 
-          // Auto-start next round after 5 seconds
-          setTimeout(() => {
-            // Check if game still exists (players might have left)
-            if (store.getGame(game.roomId)) {
-              GameLogic.startRound(game);
-              this.broadcastState(game.roomId);
+          setTimeout(async () => {
+            const g = await this.store.getGame(game.roomId);
+            if (g) {
+              GameLogic.startRound(g);
+              await this.store.saveGame(game.roomId, g);
+              await this.broadcastState(game.roomId);
             }
           }, 5000);
         } else {
-          // Trick over, next trick starts with winner
-          // Wait 2 seconds so people can see who won the trick
-          setTimeout(() => {
-            this.broadcastState(game.roomId);
-          }, 1500);
-          // Send immediate update so they see the card played,
-          // then the 2s delay happens before the table clears.
-          this.broadcastState(game.roomId);
+          await this.store.saveGame(game.roomId, game);
+          await this.broadcastState(game.roomId);
+          setTimeout(() => this.broadcastState(game.roomId), 1500);
         }
       } else {
-        // Next player's turn
         game.currentTurnIndex =
           (game.currentTurnIndex + 1) % game.players.length;
-        this.broadcastState(game.roomId);
+        await this.store.saveGame(game.roomId, game);
+        await this.broadcastState(game.roomId);
       }
     });
   }
 
   // --- 5. DISCONNECT ---
   private handleDisconnect(socket: Socket) {
-    socket.on("disconnect", () => {
-      const game = store.findRoomByPlayerId(socket.id);
+    socket.on("disconnect", async () => {
+      const game = await this.store.findRoomByPlayerId(socket.id);
       if (game) {
         const player = game.players.find((p) => p.id === socket.id);
         if (player) player.connected = false;
@@ -302,39 +292,47 @@ export class SocketManager {
           game.players = game.players.filter((p) => p.id !== socket.id);
         }
 
-        this.broadcastState(game.roomId);
+        await this.store.deleteSocketRoom(socket.id);
+        await this.store.saveGame(game.roomId, game);
+        await this.broadcastState(game.roomId);
       }
     });
   }
 
   // --- 6. EXIT GAME ---
   private handleExit(socket: Socket) {
-    socket.on("player_exit", () => {
-      const game = store.findRoomByPlayerId(socket.id);
+    socket.on("player_exit", async () => {
+      const game = await this.store.findRoomByPlayerId(socket.id);
       if (!game) return;
+
+      await this.store.deleteSocketRoom(socket.id);
 
       if (game.phase === "LOBBY") {
         game.players = game.players.filter((p) => p.id !== socket.id);
         if (game.players.length === 0) {
-          store.deleteRoom(game.roomId);
+          await this.store.deleteRoom(game.roomId);
+          socket.leave(game.roomId);
+          return;
         }
+        await this.store.saveGame(game.roomId, game);
       } else {
         const player = game.players.find((p) => p.id === socket.id);
         if (player) {
           player.connected = false;
           game.endGameVotes = game.endGameVotes.filter(id => id !== socket.id);
         }
+        await this.store.saveGame(game.roomId, game);
       }
 
       socket.leave(game.roomId);
-      this.broadcastState(game.roomId);
+      await this.broadcastState(game.roomId);
     });
   }
 
   // --- 7. VOTE TO END GAME ---
   private handleVoteEndGame(socket: Socket) {
-    socket.on("vote_end_game", () => {
-      const game = store.findRoomByPlayerId(socket.id);
+    socket.on("vote_end_game", async () => {
+      const game = await this.store.findRoomByPlayerId(socket.id);
       if (!game) return;
 
       if (game.phase === "LOBBY" || game.phase === "GAME_OVER") return;
@@ -350,37 +348,35 @@ export class SocketManager {
           game.endGameVotes = [];
         }
 
-        this.broadcastState(game.roomId);
+        await this.store.saveGame(game.roomId, game);
+        await this.broadcastState(game.roomId);
       }
     });
   }
 
   // --- HELPER: BROADCAST STATE ---
-  private broadcastState(roomId: string) {
-    const game = store.getGame(roomId);
+  async broadcastState(roomId: string): Promise<void> {
+    const game = await this.store.getGame(roomId);
     if (!game) return;
 
-    store.saveGame(roomId);
-
-    game.players.forEach((player) => {
-      if (!player.connected) return;
+    for (const player of game.players) {
+      if (!player.connected) continue;
 
       const publicPlayers = game.players.map((p) => ({
         ...p,
         hand:
           p.id === player.id
             ? p.hand
-            : p.hand.map(() => ({ suit: "?", rank: "?", value: 0 })),
+            : (p.hand.map(() => ({ suit: "?", rank: "?", value: 0 })) as typeof p.hand),
       }));
 
-      // create a sanitized view of state
       const publicState = {
         ...game,
         players: publicPlayers,
-        me: player.id, // tell the client which player they are
+        me: player.id,
       };
 
       this.io.to(player.id).emit("state_update", publicState);
-    });
+    }
   }
 }

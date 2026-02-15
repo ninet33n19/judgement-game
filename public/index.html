@@ -4,364 +4,375 @@
         <meta charset="UTF-8" />
         <meta
             name="viewport"
-            content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
         />
-        <title>Judgement</title>
-        <link rel="stylesheet" href="styles.css" />
-    </head>
+        <title>Judgement | Stateless Card Game</title>
 
+        <!-- CSS Dependencies -->
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/@knadh/oat/oat.min.css"
+        />
+        <link rel="stylesheet" href="styles.css" />
+
+        <!-- JS Dependencies -->
+        <script src="https://unpkg.com/@knadh/oat/oat.min.js" defer></script>
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        <script
+            src="https://cdn.socket.io/3.1.3/socket.io.min.js"
+            integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh"
+            crossorigin="anonymous"
+        ></script>
+        <script src="client.js" defer></script>
+    </head>
     <body>
         <div id="app">
-            <!-- Connection Status -->
+            <!-- Status Indicator -->
             <div id="connection-status" class="connection-status hidden">
                 <span class="dot"></span>
-                <span class="text">Connected</span>
+                <span class="text">Connecting...</span>
             </div>
 
-            <!-- Join Screen -->
+            <!-- Toast Notifications -->
+            <div id="toast" class="toast hidden"></div>
+
+            <!-- 1. Join Screen -->
             <div id="join-screen" class="screen">
                 <div class="card-container">
                     <div class="screen-title">
-                        <div class="logo">🎴</div>
-                        <h1>Judgement</h1>
-                        <p class="screen-subtitle">A card game of strategy</p>
+                        <h1 class="logo">Judgement</h1>
+                        <p class="screen-subtitle">Multiplayer Card Game</p>
                     </div>
 
-                    <div class="input-group">
+                    <div class="form-group">
                         <label class="form-label" for="name-input"
-                            >Your Name</label
+                            >Display Name</label
                         >
                         <input
-                            type="text"
                             id="name-input"
-                            placeholder="Enter your name"
+                            type="text"
+                            placeholder="Your name"
                             maxlength="12"
-                            class="input"
-                            autocomplete="off"
+                            class="btn"
+                            style="
+                                text-align: left;
+                                background: var(--bg-secondary);
+                            "
                         />
                     </div>
 
-                    <button id="create-btn" class="btn btn-primary">
-                        Create Room
-                    </button>
-
-                    <div class="divider">or</div>
-
-                    <div class="input-group">
+                    <div class="form-group">
                         <label class="form-label" for="room-input"
                             >Room Code</label
                         >
                         <input
-                            type="text"
                             id="room-input"
-                            placeholder="Enter code"
+                            type="text"
+                            placeholder="6-char code"
                             maxlength="6"
-                            class="input uppercase"
-                            autocomplete="off"
+                            class="btn"
+                            style="
+                                text-align: left;
+                                background: var(--bg-secondary);
+                                text-transform: uppercase;
+                            "
                         />
                     </div>
 
-                    <button id="join-btn" class="btn btn-secondary">
-                        Join Game
+                    <button id="join-btn" class="btn btn-primary">
+                        Join Room
+                    </button>
+                    <div class="divider"><span>OR</span></div>
+                    <button id="create-btn" class="btn btn-secondary">
+                        Create Room
                     </button>
                 </div>
             </div>
 
-            <!-- Lobby Screen -->
+            <!-- 2. Lobby Screen -->
             <div id="lobby-screen" class="screen hidden">
-                <button id="exit-btn-lobby" class="exit-btn" title="Exit">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-
                 <div class="lobby-layout">
                     <div class="lobby-content">
                         <div class="room-card">
-                            <div class="room-code-label">Room Code</div>
                             <div class="room-code-group">
+                                <span class="room-code-label">Room Code</span>
                                 <div class="room-code-badge">
                                     <span id="room-name" class="code-text"
                                         >------</span
                                     >
-                                </div>
-                                <button
-                                    id="copy-code-btn"
-                                    class="icon-btn"
-                                    title="Copy code"
-                                >
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
+                                    <button
+                                        id="copy-code-btn"
+                                        style="
+                                            background: none;
+                                            border: none;
+                                            color: var(--accent-primary);
+                                            cursor: pointer;
+                                            padding: 4px;
+                                        "
                                     >
-                                        <rect
-                                            width="14"
-                                            height="14"
-                                            x="8"
-                                            y="8"
-                                            rx="2"
-                                            ry="2"
-                                        ></rect>
-                                        <path
-                                            d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
-                                        ></path>
-                                    </svg>
-                                </button>
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="18"
+                                            height="18"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        >
+                                            <rect
+                                                x="9"
+                                                y="9"
+                                                width="13"
+                                                height="13"
+                                                rx="2"
+                                                ry="2"
+                                            ></rect>
+                                            <path
+                                                d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                                            ></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div
+                                style="
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    margin-top: 1rem;
+                                "
+                            >
+                                <span class="room-code-label">Players</span>
+                                <span
+                                    style="
+                                        font-weight: 700;
+                                        color: var(--text-primary);
+                                    "
+                                >
+                                    <span id="player-count-current">0</span> /
+                                    <span id="player-count-max">6</span>
+                                </span>
                             </div>
                         </div>
 
-                        <div class="player-count">
-                            <span id="player-count-current">0</span> /
-                            <span id="player-count-max">6</span> players
+                        <div id="player-grid" class="player-grid">
+                            <!-- Players render here -->
                         </div>
 
-                        <div id="player-grid" class="player-grid"></div>
-
-                        <button id="start-btn" class="start-btn" disabled>
-                            Start Game
-                        </button>
-
-                        <div class="lobby-footer">
-                            <p class="status-text">
-                                Waiting for players
-                                <span class="status-dots">
-                                    <span></span>
-                                    <span></span>
-                                    <span></span>
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Bidding Screen -->
-            <div id="bidding-screen" class="screen hidden">
-                <button id="exit-btn-bidding" class="exit-btn" title="Exit">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-
-            <div class="bidding-content">
-                <div class="header">
-                    <div class="info-badge">
-                        <span class="label">ROUND</span>
-                        <span id="round-num" class="value">-</span>
-                    </div>
-                    <div class="info-badge">
-                        <span class="label">TRUMP</span>
-                        <span id="trump-suit" class="value">-</span>
-                    </div>
-                    <div class="info-badge">
-                        <span class="label">CARDS</span>
-                        <span id="cards-count" class="value">-</span>
-                    </div>
-                    <div id="dealer-badge" class="info-badge" style="display: none;">
-                        <span class="label">DEALER</span>
-                        <span id="dealer-name" class="value">-</span>
-                    </div>
-                </div>
-
-                <div class="bidding-main">
-                    <div class="hand-area-container my-hand-container">
-                        <div id="bid-hand-area" class="hand-cards-fan"></div>
-                    </div>
-
-                    <div class="bid-controls">
-                        <p id="bid-instruction">Waiting for others...</p>
-                        <div id="bid-buttons" class="bid-grid"></div>
-                    </div>
-                </div>
-
-                <div id="player-row" class="players-status-grid"></div>
-            </div>
-                <div class="info-badge">
-                    <span class="label">Trump</span>
-                    <span class="value" id="trump-suit">-</span>
-                </div>
-                <div class="info-badge">
-                    <span class="label">Cards</span>
-                    <span class="value" id="cards-count">-</span>
-                </div>
-                <div class="info-badge">
-                    <span class="label">Dealer</span>
-                    <span class="value" id="dealer-name">-</span>
-                </div>
-            </div>
-
-            <div class="bidding-main">
-                <div class="hand-area-section">
-                    <div class="my-hand-container">
-                        <div id="bid-hand-area" class="hand-cards-fan"></div>
-                    </div>
-                </div>
-
-                <div class="bidding-controls">
-                    <h3 id="bidding-status">Place your bid</h3>
-                    <div id="bid-buttons" class="bid-grid"></div>
-                </div>
-            </div>
-
-            <div class="players-status-section">
-                <div id="player-row" class="player-status-grid"></div>
-            </div>
-        </div>
-    </div>
-
-            <!-- Playing Screen -->
-            <div id="playing-screen" class="screen hidden">
-                <button
-                    id="exit-btn-playing"
-                    class="exit-btn-playing"
-                    title="Exit"
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-
-                <!-- Top: Opponents -->
-                <div class="opponents-container">
-                    <div id="play-player-row" class="opponents-row"></div>
-                </div>
-
-                <!-- Middle: Table -->
-                <div class="table-container">
-                    <div id="play-table-cards" class="table-cards-grid"></div>
-                </div>
-
-                <!-- Bottom: Player Dashboard -->
-                <div class="player-dashboard">
-                    <!-- Bid/Tricks/Avatar Row -->
-                    <div class="dashboard-stats-row">
-                        <div class="stat-pill">
-                            <span>Bid:</span>
-                            <span class="value" id="my-bid">-</span>
-                        </div>
-                        <div class="stat-pill">
-                            <span>Tricks:</span>
-                            <span class="value" id="my-tricks">0</span>
-                        </div>
-                        <div class="my-avatar-circle" id="my-mini-avatar"></div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="game-actions">
-                        <button id="btn-play-card" class="action-btn" disabled>
-                            Play Card
-                        </button>
-                    </div>
-
-                    <!-- Hand -->
-                    <div class="my-hand-container">
-                        <div id="hand-area" class="hand-cards-fan"></div>
-                    </div>
-                </div>
-
-                <!-- Floating Game Info -->
-                <div class="game-info-overlay">
-                    <div class="info-badge">
-                        <span class="label">Round</span>
-                        <span class="value" id="play-round-num">1</span>
-                    </div>
-                    <div class="info-badge">
-                        <span class="label">Trump</span>
-                        <span class="value" id="play-trump-suit">♠</span>
-                    </div>
-                    <div class="info-badge">
-                        <span class="label">Score</span>
-                        <span class="value" id="play-score-display">0</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Round Over Screen -->
-            <div id="round-over-screen" class="screen hidden">
-                <div class="modal-overlay">
-                    <div class="modal-card">
-                        <div class="modal-header">
-                            <h2 class="modal-title">Round Complete!</h2>
-                            <p class="modal-subtitle">
-                                Results for round
-                                <span id="round-result-num">1</span>
-                            </p>
-                        </div>
-                        <div id="round-results" class="results-list"></div>
-                        <p class="status-text" style="text-align: center">
-                            Next round starting soon...
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Game Over Screen -->
-            <div id="game-over-screen" class="screen hidden">
-                <div class="modal-overlay">
-                    <div class="modal-card">
-                        <div class="modal-header">
-                            <h2 class="modal-title">🏆 Game Over!</h2>
-                            <p class="modal-subtitle">Final standings</p>
-                        </div>
-                        <div id="final-scores" class="results-list"></div>
-                        <div class="modal-actions">
-                            <button id="restart-btn" class="btn btn-primary">
-                                Play Again
+                        <div
+                            style="
+                                width: 100%;
+                                display: flex;
+                                flex-direction: column;
+                                gap: 0.75rem;
+                                margin-top: 1rem;
+                            "
+                        >
+                            <button
+                                id="start-btn"
+                                class="btn btn-primary"
+                                disabled
+                            >
+                                Start Game
+                            </button>
+                            <button
+                                id="exit-btn-lobby"
+                                class="btn btn-secondary"
+                            >
+                                Exit Room
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Error Toast -->
-            <div id="toast" class="toast hidden"></div>
-        </div>
+            <!-- 3. Bidding Screen -->
+            <div id="bidding-screen" class="screen hidden">
+                <div class="game-info-overlay">
+                    <div class="info-badge">
+                        <span class="label">RD</span>
+                        <span id="round-num" class="value">1</span>
+                    </div>
+                    <div class="info-badge">
+                        <span class="label">TRUMP</span>
+                        <span id="trump-suit" class="value">♠</span>
+                    </div>
+                    <div class="info-badge">
+                        <span class="label">CARDS</span>
+                        <span id="cards-count" class="value">13</span>
+                    </div>
+                    <div id="dealer-badge" class="info-badge">
+                        <span class="label">DEALER</span>
+                        <span id="dealer-name" class="value">-</span>
+                    </div>
+                </div>
 
-        <script
-            src="https://cdn.socket.io/4.8.3/socket.io.min.js"
-            integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0"
-            crossorigin="anonymous"
-        ></script>
-        <script src="client.js"></script>
+                <div class="bid-area">
+                    <h2 id="bid-prompt" class="bid-prompt">Your bid?</h2>
+                    <div id="bid-buttons" class="bid-buttons">
+                        <!-- Bids render here -->
+                    </div>
+                </div>
+
+                <div id="bid-hand-area" class="hand-area">
+                    <!-- Preview hand cards here -->
+                </div>
+
+                <div id="player-row" class="player-row">
+                    <!-- Players row render here -->
+                </div>
+
+                <button id="exit-btn-bidding" class="exit-btn" title="Exit">
+                    ×
+                </button>
+            </div>
+
+            <!-- 4. Playing Screen -->
+            <div id="playing-screen" class="screen hidden" style="padding: 0">
+                <div class="game-layout">
+                    <button id="exit-btn-playing" class="exit-btn-playing">
+                        ×
+                    </button>
+
+                    <div class="game-info-overlay">
+                        <div class="info-badge">
+                            <span class="label">RD</span>
+                            <span id="play-round-num" class="value">1</span>
+                        </div>
+                        <div class="info-badge">
+                            <span class="label">TRUMP</span>
+                            <span id="play-trump-suit" class="value">♠</span>
+                        </div>
+                    </div>
+
+                    <div class="opponents-container">
+                        <div id="play-player-row" class="opponents-row">
+                            <!-- Opponents render here -->
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <div id="play-table-cards" class="table-cards-grid">
+                            <!-- Played cards render here -->
+                        </div>
+                    </div>
+
+                    <!-- Dashboard at bottom -->
+                    <div
+                        style="
+                            width: 100%;
+                            padding: 1rem;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 1rem;
+                            background: var(--bg-secondary);
+                            border-top: 1px solid var(--glass-border);
+                        "
+                    >
+                        <div
+                            style="
+                                display: flex;
+                                align-items: center;
+                                justify-content: space-between;
+                                gap: 1rem;
+                            "
+                        >
+                            <div style="display: flex; gap: 0.5rem">
+                                <div
+                                    class="info-badge"
+                                    style="height: 40px; padding: 0 1rem"
+                                >
+                                    <span class="label">SCORE</span>
+                                    <span id="play-score-display" class="value"
+                                        >0</span
+                                    >
+                                </div>
+                                <div
+                                    class="info-badge"
+                                    style="height: 40px; padding: 0 1rem"
+                                >
+                                    <span id="my-bid" class="value">-</span>
+                                    <span class="label">/</span>
+                                    <span id="my-tricks" class="value">0</span>
+                                </div>
+                            </div>
+
+                            <div
+                                id="my-mini-avatar"
+                                class="opponent-avatar"
+                                style="width: 48px; height: 48px; margin: 0"
+                            >
+                                <!-- My avatar here -->
+                            </div>
+
+                            <button
+                                id="btn-play-card"
+                                class="action-btn"
+                                disabled
+                                style="flex: 1"
+                            >
+                                Play Card
+                            </button>
+                        </div>
+
+                        <div class="my-hand-container">
+                            <div id="hand-area" class="hand-cards-fan">
+                                <!-- Hand cards render here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Round Over Screen -->
+            <div id="round-over-screen" class="screen modal-overlay hidden">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h2 class="modal-title">
+                            Round <span id="round-result-num">1</span> Results
+                        </h2>
+                        <p class="modal-subtitle">Current standings</p>
+                    </div>
+                    <div id="round-results" class="results-list">
+                        <!-- Results render here -->
+                    </div>
+                    <div class="modal-actions">
+                        <button
+                            id="exit-btn-roundover"
+                            class="btn btn-secondary"
+                        >
+                            Exit Game
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. Game Over Screen -->
+            <div id="game-over-screen" class="screen modal-overlay hidden">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h1 style="font-size: 3rem; margin-bottom: 1rem">🏆</h1>
+                        <h2 class="modal-title">Final Standings</h2>
+                        <p class="modal-subtitle">Game over</p>
+                    </div>
+                    <div id="final-scores" class="results-list">
+                        <!-- Final scores render here -->
+                    </div>
+                    <div class="modal-actions">
+                        <button id="restart-btn" class="btn btn-primary">
+                            Play Again
+                        </button>
+                        <button
+                            id="exit-btn-gameover"
+                            class="btn btn-secondary"
+                        >
+                            Menu
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </body>
 </html>

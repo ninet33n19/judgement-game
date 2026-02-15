@@ -15,11 +15,31 @@ function getAvatar(playerName) {
     return assignedAvatars[playerName];
 }
 
+// Skribbl-style URL: room code in query (?ROOMCODE)
+function getRoomCodeFromUrl() {
+    const search = window.location.search;
+    if (!search || search.length < 2) return null;
+    const code = search.slice(1).toUpperCase();
+    if (/^[A-Z0-9]{6}$/.test(code)) return code;
+    return null;
+}
+
+function updateUrlWithRoom(roomId) {
+    const base = window.location.pathname || "/";
+    const url = roomId ? `${base}?${roomId}` : base;
+    window.history.replaceState(null, "", url);
+}
+
+function clearUrlRoom() {
+    updateUrlWithRoom(null);
+}
+
 function init() {
     socket = io();
 
     setupEventListeners();
     loadCredentials();
+    applyUrlRoomToForm();
     setupSocketHandlers();
 }
 
@@ -49,6 +69,14 @@ function loadCredentials() {
         } catch (e) {
             console.error("Failed to load credentials", e);
         }
+    }
+}
+
+function applyUrlRoomToForm() {
+    const roomFromUrl = getRoomCodeFromUrl();
+    if (roomFromUrl) {
+        const roomInput = document.getElementById("room-input");
+        if (roomInput && !roomInput.value.trim()) roomInput.value = roomFromUrl;
     }
 }
 
@@ -126,8 +154,10 @@ function setupEventListeners() {
     if (copyBtn) copyBtn.addEventListener("click", () => {
         const code = document.getElementById("room-name").textContent;
         if (code && code !== "------") {
-            navigator.clipboard.writeText(code).then(() => {
-                showToast("Room code copied!", "success");
+            const url = window.location.href;
+            const toCopy = url.includes("?") ? url : `${url}?${code}`;
+            navigator.clipboard.writeText(toCopy).then(() => {
+                showToast("Link copied!", "success");
             }).catch(() => {
                 showToast("Failed to copy", "error");
             });
@@ -196,9 +226,10 @@ function handleExit() {
             return;
         }
     }
-    
+
     socket.emit("player_exit");
     clearCredentials();
+    clearUrlRoom();
     socket.disconnect();
     state = null;
     myId = null;
@@ -239,9 +270,8 @@ function setupSocketHandlers() {
     socket.on("reconnected", (data) => {
         updateConnectionStatus("connected");
         showToast("Reconnected!", "success");
-        
+        if (data && data.roomId) updateUrlWithRoom(data.roomId);
         if (data && data.sessionToken) {
-            // Recover name from sessionStorage if input is empty
             let name = document.getElementById("name-input").value.trim();
             if (!name) {
                 const activeSession = sessionStorage.getItem("judgement_session");
@@ -263,6 +293,7 @@ function setupSocketHandlers() {
         const name = document.getElementById("name-input").value.trim();
         const roomId = data.roomId;
         saveCredentials(name, roomId, data.sessionToken);
+        updateUrlWithRoom(roomId);
         showScreen("lobby-screen");
         showToast("Room created!", "success");
     });
@@ -270,6 +301,7 @@ function setupSocketHandlers() {
     socket.on("joined_game", (data) => {
         const name = document.getElementById("name-input").value.trim();
         saveCredentials(name, data.roomId, data.sessionToken);
+        updateUrlWithRoom(data.roomId);
         showToast("Joined game!", "success");
     });
 
@@ -431,7 +463,7 @@ function renderBidding() {
     const dealerBadge = document.getElementById("dealer-badge");
     const dealerName = document.getElementById("dealer-name");
     if (dealerBadge && dealerName) {
-        const dealer = room.players.find(p => p.isDealer);
+        const dealer = state.players[state.dealerIndex];
         if (dealer) {
             dealerBadge.style.display = "flex";
             dealerName.textContent = dealer.name;
